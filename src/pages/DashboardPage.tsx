@@ -56,7 +56,8 @@ const DashboardPage = () => {
             {savedCreators.map((creator) => (
               <Card
                 key={creator.id}
-                className="group bg-card border-gold/10 hover:border-gold/40 transition-all duration-500 overflow-hidden hover:shadow-gold animate-fade-in"
+                onClick={() => navigate(`/channel/${creator.channel_id}`)}
+                className="group cursor-pointer bg-card border-gold/10 hover:border-gold/40 transition-all duration-500 overflow-hidden hover:shadow-gold animate-fade-in"
               >
                 <CardContent className="p-6">
                   <div className="flex flex-col items-center text-center space-y-4">
@@ -98,7 +99,10 @@ const DashboardPage = () => {
                     <Button
                       variant="outline"
                       size="sm"
-                      onClick={() => removeCreator.mutate(creator.channel_id)}
+                      onClick={(e) => {
+                        e.stopPropagation();
+                        removeCreator.mutate(creator.channel_id);
+                      }}
                       disabled={removeCreator.isPending}
                       className="border-destructive/50 text-destructive hover:bg-destructive/10"
                     >
