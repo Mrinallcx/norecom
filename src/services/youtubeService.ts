@@ -18,6 +18,8 @@ export interface YouTubeVideo {
   channelTitle: string;
   publishedAt: string;
   description: string;
+  views?: string;
+  duration?: string;
 }
 
 export const searchYouTubeChannels = async (query: string): Promise<YouTubeChannel[]> => {
@@ -40,6 +42,19 @@ export const searchYouTubeVideos = async (query: string): Promise<YouTubeVideo[]
 
   if (error) {
     console.error("YouTube search error:", error);
+    throw new Error(error.message);
+  }
+
+  return data.videos || [];
+};
+
+export const getChannelVideos = async (channelId: string): Promise<YouTubeVideo[]> => {
+  const { data, error } = await supabase.functions.invoke("youtube-search", {
+    body: { channelId },
+  });
+
+  if (error) {
+    console.error("YouTube channel videos error:", error);
     throw new Error(error.message);
   }
 
