@@ -22,7 +22,20 @@ export interface YouTubeVideo {
   duration?: string;
 }
 
+// In-memory cache for search results
+const searchCache = new Map<string, { data: YouTubeChannel[]; timestamp: number }>();
+const CACHE_DURATION = 30 * 60 * 1000; // 30 minutes
+
 export const searchYouTubeChannels = async (query: string): Promise<YouTubeChannel[]> => {
+  const cacheKey = query.toLowerCase().trim();
+  
+  // Check cache first
+  const cached = searchCache.get(cacheKey);
+  if (cached && Date.now() - cached.timestamp < CACHE_DURATION) {
+    console.log("Using cached results for:", query);
+    return cached.data;
+  }
+
   const { data, error } = await supabase.functions.invoke("youtube-search", {
     body: { query, type: "channel" },
   });
@@ -32,7 +45,12 @@ export const searchYouTubeChannels = async (query: string): Promise<YouTubeChann
     throw new Error(error.message);
   }
 
-  return data.channels || [];
+  const channels = data.channels || [];
+  
+  // Store in cache
+  searchCache.set(cacheKey, { data: channels, timestamp: Date.now() });
+  
+  return channels;
 };
 
 export const searchYouTubeVideos = async (query: string): Promise<YouTubeVideo[]> => {
