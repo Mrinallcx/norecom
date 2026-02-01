@@ -4,6 +4,7 @@ import { useQuery, useInfiniteQuery } from "@tanstack/react-query";
 import { ArrowLeft, Users, Play, Loader2 } from "lucide-react";
 import Header from "@/components/Header";
 import YouTubeVideoCard from "@/components/YouTubeVideoCard";
+import { YouTubeVideoSkeleton } from "@/components/YouTubeVideoSkeleton";
 import YouTubePlayerModal from "@/components/YouTubePlayerModal";
 import { Avatar, AvatarFallback, AvatarImage } from "@/components/ui/avatar";
 import { Button } from "@/components/ui/button";
@@ -137,9 +138,10 @@ const YouTubeCreatorPage = () => {
           </h2>
 
           {isLoading ? (
-            <div className="flex flex-col items-center justify-center py-16">
-              <Loader2 className="h-8 w-8 animate-spin text-gold mb-4" />
-              <p className="text-muted-foreground">Loading videos...</p>
+            <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-3 gap-6">
+              {Array.from({ length: 9 }).map((_, index) => (
+                <YouTubeVideoSkeleton key={index} />
+              ))}
             </div>
           ) : videos.length > 0 ? (
             <>
