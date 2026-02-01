@@ -1,5 +1,5 @@
 import { Link, useNavigate } from "react-router-dom";
-import { Play, LogIn, LogOut, LayoutDashboard } from "lucide-react";
+import { Play, LogIn, LogOut } from "lucide-react";
 import { useAuth } from "@/contexts/AuthContext";
 import { Button } from "@/components/ui/button";
 
@@ -27,15 +27,6 @@ const Header = () => {
         <div className="flex items-center gap-2">
           {user ? (
             <>
-              <Button
-                variant="ghost"
-                size="sm"
-                onClick={() => navigate("/dashboard")}
-                className="text-muted-foreground hover:text-gold"
-              >
-                <LayoutDashboard className="h-4 w-4 mr-2" />
-                Dashboard
-              </Button>
               <Button
                 variant="outline"
                 size="sm"
