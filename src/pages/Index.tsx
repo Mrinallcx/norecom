@@ -1,4 +1,4 @@
-import { useState, useMemo } from "react";
+import { useState, useMemo, useEffect } from "react";
 import { useNavigate } from "react-router-dom";
 import { useQuery } from "@tanstack/react-query";
 import Header from "@/components/Header";
@@ -31,19 +31,20 @@ const Index = () => {
   const navigate = useNavigate();
   const { savedCreators, isLoading: isLoadingSaved, removeCreator, isCreatorSaved } = useSavedCreators();
 
-  // Debounce search query
-  useMemo(() => {
+  // Proper debounce with useEffect - 800ms delay to reduce API calls
+  useEffect(() => {
     const timer = setTimeout(() => {
       setDebouncedQuery(searchQuery);
-    }, 500);
+    }, 800);
     return () => clearTimeout(timer);
   }, [searchQuery]);
 
   const { data: youtubeChannels = [], isLoading, error } = useQuery({
     queryKey: ["youtube-channels", debouncedQuery],
     queryFn: () => searchYouTubeChannels(debouncedQuery),
-    enabled: debouncedQuery.length >= 2,
-    staleTime: 1000 * 60 * 5,
+    enabled: debouncedQuery.length >= 3, // Require 3+ chars to reduce unnecessary searches
+    staleTime: 1000 * 60 * 30, // Cache for 30 minutes
+    gcTime: 1000 * 60 * 60, // Keep in garbage collection for 1 hour
   });
 
   // Get unique categories from saved creators
@@ -66,7 +67,7 @@ const Index = () => {
     setChannelToSave(channel);
   };
 
-  const showSearchResults = debouncedQuery.length >= 2;
+  const showSearchResults = debouncedQuery.length >= 3;
 
   return (
     <div className="min-h-screen bg-background">
@@ -121,7 +122,7 @@ const Index = () => {
                   />
                 ))}
               </>
-            ) : debouncedQuery.length >= 2 ? (
+            ) : debouncedQuery.length >= 3 ? (
               <div className="text-center py-8">
                 <p className="text-muted-foreground text-sm">
                   No creators found for "{debouncedQuery}"
@@ -139,7 +140,7 @@ const Index = () => {
               Start typing to search for YouTube creators
             </p>
             <p className="text-muted-foreground text-sm mt-2">
-              Enter at least 2 characters to begin searching
+              Enter at least 3 characters to begin searching
             </p>
             {!user && (
               <Button onClick={() => navigate("/auth")} className="bg-gold hover:bg-gold/90 mt-6">
