@@ -11,7 +11,7 @@ serve(async (req) => {
   }
 
   try {
-    const { query, type = "channel", channelId } = await req.json();
+    const { query, type = "channel", channelId, pageToken } = await req.json();
     const apiKey = Deno.env.get("YOUTUBE_API_KEY");
 
     if (!apiKey) {
@@ -21,7 +21,8 @@ serve(async (req) => {
     // Fetch videos by channel ID
     if (channelId) {
       // Fetch more videos initially to have enough after filtering
-      const videosUrl = `https://www.googleapis.com/youtube/v3/search?part=snippet&channelId=${channelId}&type=video&order=date&maxResults=50&key=${apiKey}`;
+      const pageTokenParam = pageToken ? `&pageToken=${pageToken}` : "";
+      const videosUrl = `https://www.googleapis.com/youtube/v3/search?part=snippet&channelId=${channelId}&type=video&order=date&maxResults=50${pageTokenParam}&key=${apiKey}`;
       const videosResponse = await fetch(videosUrl);
       const videosData = await videosResponse.json();
 
@@ -65,7 +66,10 @@ serve(async (req) => {
           .filter((video: any) => video.durationSeconds >= 300) // 5 minutes = 300 seconds
           .slice(0, 12) || []; // Limit to 12 results
 
-        return new Response(JSON.stringify({ videos }), {
+        return new Response(JSON.stringify({ 
+          videos,
+          nextPageToken: videosData.nextPageToken || null,
+        }), {
           headers: { ...corsHeaders, "Content-Type": "application/json" },
         });
       }
