@@ -23,8 +23,9 @@ async function fetchWithRotation(url: string, keys: string[], keyIndex = 0): Pro
   const response = await fetch(fullUrl);
   const data = await response.json();
 
-  if (data.error?.message?.includes("quota")) {
-    console.log(`Key ...${apiKey.slice(-4)} quota exceeded, trying next key (${keyIndex + 1}/${keys.length})`);
+  // Rotate on quota exceeded OR expired/invalid keys
+  if (data.error?.message?.includes("quota") || data.error?.message?.includes("expired") || data.error?.message?.includes("invalid")) {
+    console.log(`Key ...${apiKey.slice(-4)} failed (${data.error.message.slice(0, 30)}...), trying next key (${keyIndex + 1}/${keys.length})`);
     return fetchWithRotation(url, keys, keyIndex + 1);
   }
 
