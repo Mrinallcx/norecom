@@ -3,6 +3,7 @@ import { useNavigate } from "react-router-dom";
 import { useQuery } from "@tanstack/react-query";
 import Header from "@/components/Header";
 import SearchBar from "@/components/SearchBar";
+import SearchResultItem from "@/components/SearchResultItem";
 import SaveCreatorDialog from "@/components/SaveCreatorDialog";
 import { Card, CardContent } from "@/components/ui/card";
 import { Avatar, AvatarFallback, AvatarImage } from "@/components/ui/avatar";
@@ -16,9 +17,7 @@ import {
   Search, 
   Users, 
   Play, 
-  HeartOff, 
   Trash2,
-  Plus
 } from "lucide-react";
 
 const Index = () => {
@@ -26,6 +25,7 @@ const Index = () => {
   const [debouncedQuery, setDebouncedQuery] = useState("");
   const [selectedCategory, setSelectedCategory] = useState<string | null>(null);
   const [channelToSave, setChannelToSave] = useState<YouTubeChannel | null>(null);
+  const [isSearchFocused, setIsSearchFocused] = useState(false);
   
   const { user } = useAuth();
   const navigate = useNavigate();
@@ -66,6 +66,8 @@ const Index = () => {
     setChannelToSave(channel);
   };
 
+  const showSearchResults = debouncedQuery.length >= 2;
+
   return (
     <div className="min-h-screen bg-background">
       <Header />
@@ -81,109 +83,57 @@ const Index = () => {
           </p>
         </section>
 
-        {/* Search */}
+        {/* Search with Dropdown Results */}
         <section className="flex justify-center">
           <SearchBar
             value={searchQuery}
             onChange={setSearchQuery}
             placeholder="Search YouTube creators..."
-          />
-        </section>
-
-        {/* Search Results */}
-        {debouncedQuery.length >= 2 && (
-          <section className="space-y-4">
-            <h2 className="text-xl font-light text-foreground">Search Results</h2>
-            
+            isLoading={isLoading}
+            showResults={showSearchResults}
+            onFocus={() => setIsSearchFocused(true)}
+            onBlur={() => setIsSearchFocused(false)}
+          >
             {isLoading ? (
-              <div className="flex flex-col items-center justify-center py-12">
-                <Loader2 className="h-8 w-8 animate-spin text-gold mb-4" />
-                <p className="text-muted-foreground">Searching YouTube...</p>
+              <div className="flex flex-col items-center justify-center py-8">
+                <Loader2 className="h-6 w-6 animate-spin text-gold mb-2" />
+                <p className="text-sm text-muted-foreground">Searching YouTube...</p>
               </div>
             ) : error ? (
-              <div className="text-center py-12">
-                <p className="text-destructive">Failed to search. Please try again.</p>
+              <div className="text-center py-8">
+                <p className="text-destructive text-sm">Failed to search. Please try again.</p>
               </div>
             ) : youtubeChannels.length > 0 ? (
-              <div className="space-y-3">
-                {youtubeChannels.map((channel) => {
-                  const isSaved = isCreatorSaved(channel.id);
-                  return (
-                    <Card
-                      key={channel.id}
-                      className="group bg-card border-gold/10 hover:border-gold/40 transition-all duration-300 hover:shadow-gold"
-                    >
-                      <CardContent className="p-5">
-                        <div className="flex items-center gap-5">
-                          <Avatar className="h-16 w-16 ring-2 ring-gold/20 group-hover:ring-gold/50 transition-all duration-300 shrink-0">
-                            <AvatarImage src={channel.avatar} alt={channel.name} className="object-cover" />
-                            <AvatarFallback className="bg-secondary text-foreground text-lg">
-                              {channel.name.charAt(0)}
-                            </AvatarFallback>
-                          </Avatar>
-
-                          <div className="flex-1 min-w-0 space-y-1.5">
-                            <h3 className="text-foreground font-medium text-lg truncate group-hover:text-gold transition-colors">
-                              {channel.name}
-                            </h3>
-                            <p className="text-sm text-muted-foreground line-clamp-2">
-                              {channel.description || "No description available"}
-                            </p>
-                            <div className="flex items-center gap-5 pt-1">
-                              <span className="flex items-center gap-1.5 text-sm">
-                                <Users className="h-4 w-4 text-gold" />
-                                <span className="text-foreground font-medium">{channel.subscriberCount}</span>
-                                <span className="text-muted-foreground">subscribers</span>
-                              </span>
-                              <span className="flex items-center gap-1.5 text-sm">
-                                <Play className="h-4 w-4 text-gold" />
-                                <span className="text-foreground font-medium">{channel.videoCount}</span>
-                                <span className="text-muted-foreground">videos</span>
-                              </span>
-                            </div>
-                          </div>
-
-                          <Button
-                            variant={isSaved ? "outline" : "default"}
-                            size="default"
-                            onClick={() => isSaved ? removeCreator.mutate(channel.id) : handleSaveClick(channel)}
-                            disabled={removeCreator.isPending}
-                            className={`shrink-0 ${isSaved 
-                              ? "border-gold/30 text-gold hover:bg-gold/10" 
-                              : "bg-gold hover:bg-gold/90 text-primary-foreground"
-                            }`}
-                          >
-                            {isSaved ? (
-                              <>
-                                <HeartOff className="h-4 w-4 mr-2" />
-                                Saved
-                              </>
-                            ) : (
-                              <>
-                                <Plus className="h-4 w-4 mr-2" />
-                                Save Creator
-                              </>
-                            )}
-                          </Button>
-                        </div>
-                      </CardContent>
-                    </Card>
-                  );
-                })}
-              </div>
-            ) : (
-              <div className="text-center py-12">
-                <p className="text-muted-foreground">
-                  No creators found matching "{debouncedQuery}"
+              <>
+                <div className="px-4 py-2 border-b border-gold/10 bg-secondary/30">
+                  <p className="text-xs text-muted-foreground">
+                    Found {youtubeChannels.length} creators
+                  </p>
+                </div>
+                {youtubeChannels.map((channel) => (
+                  <SearchResultItem
+                    key={channel.id}
+                    channel={channel}
+                    isSaved={isCreatorSaved(channel.id)}
+                    isPending={removeCreator.isPending}
+                    onSave={() => handleSaveClick(channel)}
+                    onRemove={() => removeCreator.mutate(channel.id)}
+                  />
+                ))}
+              </>
+            ) : debouncedQuery.length >= 2 ? (
+              <div className="text-center py-8">
+                <p className="text-muted-foreground text-sm">
+                  No creators found for "{debouncedQuery}"
                 </p>
               </div>
-            )}
-          </section>
-        )}
+            ) : null}
+          </SearchBar>
+        </section>
 
-        {/* Prompt to search */}
-        {debouncedQuery.length < 2 && savedCreators.length === 0 && (
-          <div className="text-center py-16">
+        {/* Prompt to search for non-authenticated users with no saved creators */}
+        {savedCreators.length === 0 && (
+          <div className="text-center py-12">
             <Search className="h-16 w-16 text-gold/30 mx-auto mb-4" />
             <p className="text-muted-foreground text-lg">
               Start typing to search for YouTube creators
@@ -191,12 +141,17 @@ const Index = () => {
             <p className="text-muted-foreground text-sm mt-2">
               Enter at least 2 characters to begin searching
             </p>
+            {!user && (
+              <Button onClick={() => navigate("/auth")} className="bg-gold hover:bg-gold/90 mt-6">
+                Sign In to Save Creators
+              </Button>
+            )}
           </div>
         )}
 
         {/* Saved Creators Section */}
         {user && savedCreators.length > 0 && (
-          <section className="space-y-6 pt-8 border-t border-gold/10">
+          <section className="space-y-6 pt-4">
             <div className="flex flex-col sm:flex-row sm:items-center justify-between gap-4">
               <h2 className="text-2xl font-light text-gradient-gold">Your Saved Creators</h2>
               
@@ -306,18 +261,6 @@ const Index = () => {
                 ))}
               </div>
             )}
-          </section>
-        )}
-
-        {/* Login prompt for non-authenticated users */}
-        {!user && debouncedQuery.length < 2 && (
-          <section className="text-center py-8">
-            <p className="text-muted-foreground mb-4">
-              Sign in to save creators and sync across devices
-            </p>
-            <Button onClick={() => navigate("/auth")} className="bg-gold hover:bg-gold/90">
-              Sign In
-            </Button>
           </section>
         )}
       </main>
