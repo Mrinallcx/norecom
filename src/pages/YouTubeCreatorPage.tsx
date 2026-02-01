@@ -1,3 +1,4 @@
+import { useState } from "react";
 import { useParams, Link } from "react-router-dom";
 import { useQuery } from "@tanstack/react-query";
 import { ArrowLeft, Users, Play, ExternalLink, Loader2 } from "lucide-react";
@@ -5,13 +6,16 @@ import Header from "@/components/Header";
 import YouTubeVideoCard from "@/components/YouTubeVideoCard";
 import { Avatar, AvatarFallback, AvatarImage } from "@/components/ui/avatar";
 import { Button } from "@/components/ui/button";
-import { getChannelVideos } from "@/services/youtubeService";
+import { getChannelVideos, YouTubeVideo } from "@/services/youtubeService";
 import { supabase } from "@/integrations/supabase/client";
 import { useAuth } from "@/contexts/AuthContext";
 
 const YouTubeCreatorPage = () => {
   const { channelId } = useParams<{ channelId: string }>();
   const { user } = useAuth();
+  const [videos, setVideos] = useState<YouTubeVideo[]>([]);
+  const [nextPageToken, setNextPageToken] = useState<string | null>(null);
+  const [isLoadingMore, setIsLoadingMore] = useState(false);
 
   // Get saved creator info from database
   const { data: creator } = useQuery({
@@ -29,12 +33,32 @@ const YouTubeCreatorPage = () => {
     enabled: !!user && !!channelId,
   });
 
-  // Fetch videos from YouTube
-  const { data: videos = [], isLoading } = useQuery({
+  // Fetch initial videos from YouTube
+  const { isLoading } = useQuery({
     queryKey: ["channel-videos", channelId],
-    queryFn: () => getChannelVideos(channelId!),
+    queryFn: async () => {
+      const result = await getChannelVideos(channelId!);
+      setVideos(result.videos);
+      setNextPageToken(result.nextPageToken);
+      return result;
+    },
     enabled: !!channelId,
   });
+
+  const handleLoadMore = async () => {
+    if (!channelId || !nextPageToken || isLoadingMore) return;
+    
+    setIsLoadingMore(true);
+    try {
+      const result = await getChannelVideos(channelId, nextPageToken);
+      setVideos((prev) => [...prev, ...result.videos]);
+      setNextPageToken(result.nextPageToken);
+    } catch (error) {
+      console.error("Failed to load more videos:", error);
+    } finally {
+      setIsLoadingMore(false);
+    }
+  };
 
   if (!channelId) {
     return (
@@ -128,11 +152,33 @@ const YouTubeCreatorPage = () => {
               <p className="text-muted-foreground">Loading videos...</p>
             </div>
           ) : videos.length > 0 ? (
-            <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-3 gap-6">
-              {videos.map((video) => (
-                <YouTubeVideoCard key={video.id} video={video} />
-              ))}
-            </div>
+            <>
+              <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-3 gap-6">
+                {videos.map((video) => (
+                  <YouTubeVideoCard key={video.id} video={video} />
+                ))}
+              </div>
+              
+              {nextPageToken && (
+                <div className="flex justify-center pt-8">
+                  <Button
+                    onClick={handleLoadMore}
+                    disabled={isLoadingMore}
+                    variant="outline"
+                    className="border-gold/30 text-gold hover:bg-gold/10"
+                  >
+                    {isLoadingMore ? (
+                      <>
+                        <Loader2 className="mr-2 h-4 w-4 animate-spin" />
+                        Loading...
+                      </>
+                    ) : (
+                      "Load More Videos"
+                    )}
+                  </Button>
+                </div>
+              )}
+            </>
           ) : (
             <div className="text-center py-16">
               <p className="text-muted-foreground">No videos available.</p>

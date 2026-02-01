@@ -48,9 +48,14 @@ export const searchYouTubeVideos = async (query: string): Promise<YouTubeVideo[]
   return data.videos || [];
 };
 
-export const getChannelVideos = async (channelId: string): Promise<YouTubeVideo[]> => {
+export interface ChannelVideosResponse {
+  videos: YouTubeVideo[];
+  nextPageToken: string | null;
+}
+
+export const getChannelVideos = async (channelId: string, pageToken?: string): Promise<ChannelVideosResponse> => {
   const { data, error } = await supabase.functions.invoke("youtube-search", {
-    body: { channelId },
+    body: { channelId, pageToken },
   });
 
   if (error) {
@@ -58,5 +63,8 @@ export const getChannelVideos = async (channelId: string): Promise<YouTubeVideo[
     throw new Error(error.message);
   }
 
-  return data.videos || [];
+  return {
+    videos: data.videos || [],
+    nextPageToken: data.nextPageToken || null,
+  };
 };
