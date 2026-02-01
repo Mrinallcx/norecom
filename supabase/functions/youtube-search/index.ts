@@ -70,7 +70,7 @@ serve(async (req) => {
           }]) || []
         );
 
-        // Filter videos longer than 5 minutes (300 seconds)
+        // Map all videos with their details (no duration filter - show all videos including old ones)
         const videos = videosData.items
           ?.map((item: any) => {
             const details = detailsMap.get(item.id.videoId) as { views: string; duration: string; durationSeconds: number } | undefined;
@@ -87,8 +87,7 @@ serve(async (req) => {
               durationSeconds: details?.durationSeconds || 0,
             };
           })
-          .filter((video: any) => video.durationSeconds >= 300)
-          .slice(0, 12) || [];
+          .slice(0, 24) || []; // Show up to 24 videos (increased from 12)
 
         return new Response(JSON.stringify({ 
           videos,
