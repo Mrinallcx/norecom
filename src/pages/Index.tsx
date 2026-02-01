@@ -25,9 +25,9 @@ const Index = () => {
       <Header />
       
       <main className="container py-8 space-y-8">
+        {/* Hero Section */}
         <section className="text-center space-y-4 py-8">
-          <h1 className="text-4xl md:text-5xl font-serif text-gradient-gold">
-            Discover Amazing Creators
+          <h1 className="text-4xl md:text-5xl font-light text-gradient-gold">
             Discover Amazing Creators
           </h1>
           <p className="text-muted-foreground text-lg max-w-2xl mx-auto">
