@@ -51,53 +51,67 @@ serve(async (req) => {
 
     // Fetch videos by channel ID
     if (channelId) {
-      const pageTokenParam = pageToken ? `&pageToken=${pageToken}` : "";
-      const videosUrl = `https://www.googleapis.com/youtube/v3/search?part=snippet&channelId=${channelId}&type=video&order=date&maxResults=50${pageTokenParam}`;
-      const videosData = await fetchWithRotation(videosUrl, keys);
+      const allLongVideos: any[] = [];
+      let currentPageToken = pageToken || null;
+      let pagesChecked = 0;
+      const maxPages = 4; // Check up to 4 pages (200 videos) to find long-form content
+      const targetVideos = 20; // Aim to collect 20 videos >= 5 minutes
 
-      // Get video details for view counts and durations
-      const videoIds = videosData.items?.map((item: any) => item.id.videoId).join(",");
-      if (videoIds) {
-        const detailsUrl = `https://www.googleapis.com/youtube/v3/videos?part=statistics,contentDetails&id=${videoIds}`;
-        const detailsData = await fetchWithRotation(detailsUrl, keys);
+      // Keep fetching pages until we have enough long videos or run out of pages
+      while (allLongVideos.length < targetVideos && pagesChecked < maxPages) {
+        const pageTokenParam = currentPageToken ? `&pageToken=${currentPageToken}` : "";
+        const videosUrl = `https://www.googleapis.com/youtube/v3/search?part=snippet&channelId=${channelId}&type=video&order=date&maxResults=50${pageTokenParam}`;
+        const videosData = await fetchWithRotation(videosUrl, keys);
 
-        // Create map with raw duration in seconds for filtering
-        const detailsMap = new Map(
-          detailsData.items?.map((item: any) => [item.id, {
-            views: formatCount(item.statistics.viewCount),
-            duration: formatDuration(item.contentDetails.duration),
-            durationSeconds: parseDurationToSeconds(item.contentDetails.duration),
-          }]) || []
-        );
+        if (!videosData.items || videosData.items.length === 0) break;
 
-        // Map all videos with their details (no duration filter - show all videos including old ones)
-        const videos = videosData.items
-          ?.map((item: any) => {
-            const details = detailsMap.get(item.id.videoId) as { views: string; duration: string; durationSeconds: number } | undefined;
-            return {
-              id: item.id.videoId,
-              title: item.snippet.title,
-              thumbnail: item.snippet.thumbnails.high?.url || item.snippet.thumbnails.default?.url,
-              channelId: item.snippet.channelId,
-              channelTitle: item.snippet.channelTitle,
-              publishedAt: item.snippet.publishedAt,
-              description: item.snippet.description,
-              views: details?.views || "0",
-              duration: details?.duration || "0:00",
-              durationSeconds: details?.durationSeconds || 0,
-            };
-          })
-          .slice(0, 24) || []; // Show up to 24 videos (increased from 12)
+        // Get video details for view counts and durations
+        const videoIds = videosData.items.map((item: any) => item.id.videoId).join(",");
+        if (videoIds) {
+          const detailsUrl = `https://www.googleapis.com/youtube/v3/videos?part=statistics,contentDetails&id=${videoIds}`;
+          const detailsData = await fetchWithRotation(detailsUrl, keys);
 
-        return new Response(JSON.stringify({ 
-          videos,
-          nextPageToken: videosData.nextPageToken || null,
-        }), {
-          headers: { ...corsHeaders, "Content-Type": "application/json" },
-        });
+          const detailsMap = new Map(
+            detailsData.items?.map((item: any) => [item.id, {
+              views: formatCount(item.statistics.viewCount),
+              duration: formatDuration(item.contentDetails.duration),
+              durationSeconds: parseDurationToSeconds(item.contentDetails.duration),
+            }]) || []
+          );
+
+          // Filter for videos >= 5 minutes and add to collection
+          const longVideos = videosData.items
+            .map((item: any) => {
+              const details = detailsMap.get(item.id.videoId) as { views: string; duration: string; durationSeconds: number } | undefined;
+              return {
+                id: item.id.videoId,
+                title: item.snippet.title,
+                thumbnail: item.snippet.thumbnails.high?.url || item.snippet.thumbnails.default?.url,
+                channelId: item.snippet.channelId,
+                channelTitle: item.snippet.channelTitle,
+                publishedAt: item.snippet.publishedAt,
+                description: item.snippet.description,
+                views: details?.views || "0",
+                duration: details?.duration || "0:00",
+                durationSeconds: details?.durationSeconds || 0,
+              };
+            })
+            .filter((video: any) => video.durationSeconds >= 300); // 5+ minutes only
+
+          allLongVideos.push(...longVideos);
+        }
+
+        currentPageToken = videosData.nextPageToken || null;
+        pagesChecked++;
+
+        // Stop if no more pages
+        if (!currentPageToken) break;
       }
 
-      return new Response(JSON.stringify({ videos: [], nextPageToken: null }), {
+      return new Response(JSON.stringify({ 
+        videos: allLongVideos.slice(0, targetVideos),
+        nextPageToken: currentPageToken,
+      }), {
         headers: { ...corsHeaders, "Content-Type": "application/json" },
       });
     }
