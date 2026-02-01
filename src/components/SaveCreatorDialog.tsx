@@ -1,5 +1,6 @@
 import { useState } from "react";
 import { Check, Plus, Loader2 } from "lucide-react";
+import { useQueryClient } from "@tanstack/react-query";
 import {
   Dialog,
   DialogContent,
@@ -12,6 +13,7 @@ import { Input } from "@/components/ui/input";
 import { Badge } from "@/components/ui/badge";
 import { YouTubeChannel } from "@/services/youtubeService";
 import { useSavedCreators } from "@/hooks/useSavedCreators";
+import { useAuth } from "@/contexts/AuthContext";
 
 interface SaveCreatorDialogProps {
   channel: YouTubeChannel | null;
@@ -24,6 +26,8 @@ const SaveCreatorDialog = ({ channel, existingCategories, onClose }: SaveCreator
   const [customCategory, setCustomCategory] = useState("");
   const [isAddingCustom, setIsAddingCustom] = useState(false);
   const { saveCreator } = useSavedCreators();
+  const { user } = useAuth();
+  const queryClient = useQueryClient();
 
   if (!channel) return null;
 
@@ -43,7 +47,11 @@ const SaveCreatorDialog = ({ channel, existingCategories, onClose }: SaveCreator
         category,
       },
       {
-        onSuccess: () => onClose(),
+        onSuccess: () => {
+          // Force refetch of saved creators
+          queryClient.invalidateQueries({ queryKey: ["saved-creators", user?.id] });
+          onClose();
+        },
       }
     );
   };

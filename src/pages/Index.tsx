@@ -16,7 +16,6 @@ import {
   Search, 
   Users, 
   Play, 
-  Heart, 
   HeartOff, 
   Trash2,
   Plus
@@ -112,45 +111,47 @@ const Index = () => {
                   return (
                     <Card
                       key={channel.id}
-                      className="bg-card border-gold/10 hover:border-gold/30 transition-all"
+                      className="group bg-card border-gold/10 hover:border-gold/40 transition-all duration-300 hover:shadow-gold"
                     >
-                      <CardContent className="p-4">
-                        <div className="flex items-center gap-4">
-                          <Avatar className="h-14 w-14 ring-2 ring-gold/20">
+                      <CardContent className="p-5">
+                        <div className="flex items-center gap-5">
+                          <Avatar className="h-16 w-16 ring-2 ring-gold/20 group-hover:ring-gold/50 transition-all duration-300 shrink-0">
                             <AvatarImage src={channel.avatar} alt={channel.name} className="object-cover" />
-                            <AvatarFallback className="bg-secondary text-foreground">
+                            <AvatarFallback className="bg-secondary text-foreground text-lg">
                               {channel.name.charAt(0)}
                             </AvatarFallback>
                           </Avatar>
 
-                          <div className="flex-1 min-w-0">
-                            <h3 className="text-foreground font-medium truncate">
+                          <div className="flex-1 min-w-0 space-y-1.5">
+                            <h3 className="text-foreground font-medium text-lg truncate group-hover:text-gold transition-colors">
                               {channel.name}
                             </h3>
-                            <p className="text-sm text-muted-foreground line-clamp-1">
-                              {channel.description || "No description"}
+                            <p className="text-sm text-muted-foreground line-clamp-2">
+                              {channel.description || "No description available"}
                             </p>
-                            <div className="flex items-center gap-4 mt-1 text-xs text-muted-foreground">
-                              <span className="flex items-center gap-1">
-                                <Users className="h-3 w-3 text-gold" />
-                                {channel.subscriberCount}
+                            <div className="flex items-center gap-5 pt-1">
+                              <span className="flex items-center gap-1.5 text-sm">
+                                <Users className="h-4 w-4 text-gold" />
+                                <span className="text-foreground font-medium">{channel.subscriberCount}</span>
+                                <span className="text-muted-foreground">subscribers</span>
                               </span>
-                              <span className="flex items-center gap-1">
-                                <Play className="h-3 w-3 text-gold" />
-                                {channel.videoCount} videos
+                              <span className="flex items-center gap-1.5 text-sm">
+                                <Play className="h-4 w-4 text-gold" />
+                                <span className="text-foreground font-medium">{channel.videoCount}</span>
+                                <span className="text-muted-foreground">videos</span>
                               </span>
                             </div>
                           </div>
 
                           <Button
                             variant={isSaved ? "outline" : "default"}
-                            size="sm"
+                            size="default"
                             onClick={() => isSaved ? removeCreator.mutate(channel.id) : handleSaveClick(channel)}
                             disabled={removeCreator.isPending}
-                            className={isSaved 
+                            className={`shrink-0 ${isSaved 
                               ? "border-gold/30 text-gold hover:bg-gold/10" 
-                              : "bg-gold hover:bg-gold/90"
-                            }
+                              : "bg-gold hover:bg-gold/90 text-primary-foreground"
+                            }`}
                           >
                             {isSaved ? (
                               <>
@@ -159,8 +160,8 @@ const Index = () => {
                               </>
                             ) : (
                               <>
-                                <Heart className="h-4 w-4 mr-2" />
-                                Save
+                                <Plus className="h-4 w-4 mr-2" />
+                                Save Creator
                               </>
                             )}
                           </Button>
