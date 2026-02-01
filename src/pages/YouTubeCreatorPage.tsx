@@ -4,6 +4,7 @@ import { useQuery } from "@tanstack/react-query";
 import { ArrowLeft, Users, Play, ExternalLink, Loader2 } from "lucide-react";
 import Header from "@/components/Header";
 import YouTubeVideoCard from "@/components/YouTubeVideoCard";
+import YouTubePlayerModal from "@/components/YouTubePlayerModal";
 import { Avatar, AvatarFallback, AvatarImage } from "@/components/ui/avatar";
 import { Button } from "@/components/ui/button";
 import { getChannelVideos, YouTubeVideo } from "@/services/youtubeService";
@@ -16,6 +17,7 @@ const YouTubeCreatorPage = () => {
   const [videos, setVideos] = useState<YouTubeVideo[]>([]);
   const [nextPageToken, setNextPageToken] = useState<string | null>(null);
   const [isLoadingMore, setIsLoadingMore] = useState(false);
+  const [selectedVideo, setSelectedVideo] = useState<{ id: string; title: string } | null>(null);
 
   // Get saved creator info from database
   const { data: creator } = useQuery({
@@ -58,6 +60,14 @@ const YouTubeCreatorPage = () => {
     } finally {
       setIsLoadingMore(false);
     }
+  };
+
+  const handlePlayVideo = (videoId: string, title: string) => {
+    setSelectedVideo({ id: videoId, title });
+  };
+
+  const handleClosePlayer = () => {
+    setSelectedVideo(null);
   };
 
   if (!channelId) {
@@ -155,7 +165,7 @@ const YouTubeCreatorPage = () => {
             <>
               <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-3 gap-6">
                 {videos.map((video) => (
-                  <YouTubeVideoCard key={video.id} video={video} />
+                  <YouTubeVideoCard key={video.id} video={video} onPlay={handlePlayVideo} />
                 ))}
               </div>
               
@@ -186,6 +196,12 @@ const YouTubeCreatorPage = () => {
           )}
         </section>
       </main>
+
+      <YouTubePlayerModal
+        videoId={selectedVideo?.id || null}
+        videoTitle={selectedVideo?.title}
+        onClose={handleClosePlayer}
+      />
     </div>
   );
 };
