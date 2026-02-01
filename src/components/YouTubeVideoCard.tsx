@@ -5,11 +5,12 @@ import { AspectRatio } from "@/components/ui/aspect-ratio";
 
 interface YouTubeVideoCardProps {
   video: YouTubeVideo;
+  onPlay: (videoId: string, title: string) => void;
 }
 
-const YouTubeVideoCard = ({ video }: YouTubeVideoCardProps) => {
+const YouTubeVideoCard = ({ video, onPlay }: YouTubeVideoCardProps) => {
   const handleClick = () => {
-    window.open(`https://www.youtube.com/watch?v=${video.id}`, "_blank");
+    onPlay(video.id, video.title);
   };
 
   return (
