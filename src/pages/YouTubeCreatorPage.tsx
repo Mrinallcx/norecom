@@ -1,7 +1,7 @@
 import { useState } from "react";
 import { useParams, Link } from "react-router-dom";
 import { useQuery } from "@tanstack/react-query";
-import { ArrowLeft, Users, Play, ExternalLink, Loader2 } from "lucide-react";
+import { ArrowLeft, Users, Play, Loader2 } from "lucide-react";
 import Header from "@/components/Header";
 import YouTubeVideoCard from "@/components/YouTubeVideoCard";
 import YouTubePlayerModal from "@/components/YouTubePlayerModal";
@@ -136,16 +136,6 @@ const YouTubeCreatorPage = () => {
                 </div>
               </div>
 
-              <a
-                href={`https://www.youtube.com/channel/${channelId}`}
-                target="_blank"
-                rel="noopener noreferrer"
-              >
-                <Button variant="outline" className="border-gold/30 text-gold hover:bg-gold/10">
-                  <ExternalLink className="mr-2 h-4 w-4" />
-                  View on YouTube
-                </Button>
-              </a>
             </div>
           </section>
         )}
