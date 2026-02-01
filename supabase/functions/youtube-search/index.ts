@@ -20,7 +20,8 @@ serve(async (req) => {
 
     // Fetch videos by channel ID
     if (channelId) {
-      const videosUrl = `https://www.googleapis.com/youtube/v3/search?part=snippet&channelId=${channelId}&type=video&order=date&maxResults=12&key=${apiKey}`;
+      // Fetch more videos initially to have enough after filtering
+      const videosUrl = `https://www.googleapis.com/youtube/v3/search?part=snippet&channelId=${channelId}&type=video&order=date&maxResults=50&key=${apiKey}`;
       const videosResponse = await fetch(videosUrl);
       const videosData = await videosResponse.json();
 
@@ -35,27 +36,34 @@ serve(async (req) => {
         const detailsResponse = await fetch(detailsUrl);
         const detailsData = await detailsResponse.json();
 
+        // Create map with raw duration in seconds for filtering
         const detailsMap = new Map(
           detailsData.items?.map((item: any) => [item.id, {
             views: formatCount(item.statistics.viewCount),
             duration: formatDuration(item.contentDetails.duration),
+            durationSeconds: parseDurationToSeconds(item.contentDetails.duration),
           }]) || []
         );
 
-        const videos = videosData.items?.map((item: any) => {
-          const details = detailsMap.get(item.id.videoId) as { views: string; duration: string } | undefined;
-          return {
-            id: item.id.videoId,
-            title: item.snippet.title,
-            thumbnail: item.snippet.thumbnails.high?.url || item.snippet.thumbnails.default?.url,
-            channelId: item.snippet.channelId,
-            channelTitle: item.snippet.channelTitle,
-            publishedAt: item.snippet.publishedAt,
-            description: item.snippet.description,
-            views: details?.views || "0",
-            duration: details?.duration || "0:00",
-          };
-        }) || [];
+        // Filter videos longer than 5 minutes (300 seconds)
+        const videos = videosData.items
+          ?.map((item: any) => {
+            const details = detailsMap.get(item.id.videoId) as { views: string; duration: string; durationSeconds: number } | undefined;
+            return {
+              id: item.id.videoId,
+              title: item.snippet.title,
+              thumbnail: item.snippet.thumbnails.high?.url || item.snippet.thumbnails.default?.url,
+              channelId: item.snippet.channelId,
+              channelTitle: item.snippet.channelTitle,
+              publishedAt: item.snippet.publishedAt,
+              description: item.snippet.description,
+              views: details?.views || "0",
+              duration: details?.duration || "0:00",
+              durationSeconds: details?.durationSeconds || 0,
+            };
+          })
+          .filter((video: any) => video.durationSeconds >= 300) // 5 minutes = 300 seconds
+          .slice(0, 12) || []; // Limit to 12 results
 
         return new Response(JSON.stringify({ videos }), {
           headers: { ...corsHeaders, "Content-Type": "application/json" },
@@ -150,4 +158,15 @@ function formatDuration(duration: string): string {
     return `${hours}:${minutes.toString().padStart(2, "0")}:${seconds.toString().padStart(2, "0")}`;
   }
   return `${minutes}:${seconds.toString().padStart(2, "0")}`;
+}
+
+function parseDurationToSeconds(duration: string): number {
+  const match = duration.match(/PT(?:(\d+)H)?(?:(\d+)M)?(?:(\d+)S)?/);
+  if (!match) return 0;
+  
+  const hours = parseInt(match[1] || "0");
+  const minutes = parseInt(match[2] || "0");
+  const seconds = parseInt(match[3] || "0");
+  
+  return hours * 3600 + minutes * 60 + seconds;
 }
