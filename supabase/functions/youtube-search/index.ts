@@ -5,6 +5,36 @@ const corsHeaders = {
   "Access-Control-Allow-Headers": "authorization, x-client-info, apikey, content-type",
 };
 
+// Get all API keys (comma-separated)
+function getApiKeys(): string[] {
+  const keysString = Deno.env.get("YOUTUBE_API_KEY") || "";
+  return keysString.split(",").map(k => k.trim()).filter(k => k.length > 0);
+}
+
+// Try fetch with automatic key rotation on quota errors
+async function fetchWithRotation(url: string, keys: string[], keyIndex = 0): Promise<any> {
+  if (keyIndex >= keys.length) {
+    throw new Error("All API keys have exceeded their quota. Please try again later or add more API keys.");
+  }
+
+  const apiKey = keys[keyIndex];
+  const fullUrl = url.includes("?") ? `${url}&key=${apiKey}` : `${url}?key=${apiKey}`;
+  
+  const response = await fetch(fullUrl);
+  const data = await response.json();
+
+  if (data.error?.message?.includes("quota")) {
+    console.log(`Key ...${apiKey.slice(-4)} quota exceeded, trying next key (${keyIndex + 1}/${keys.length})`);
+    return fetchWithRotation(url, keys, keyIndex + 1);
+  }
+
+  if (data.error) {
+    throw new Error(data.error.message);
+  }
+
+  return data;
+}
+
 serve(async (req) => {
   if (req.method === "OPTIONS") {
     return new Response(null, { headers: corsHeaders });
@@ -12,30 +42,23 @@ serve(async (req) => {
 
   try {
     const { query, type = "channel", channelId, pageToken } = await req.json();
-    const apiKey = Deno.env.get("YOUTUBE_API_KEY");
+    const keys = getApiKeys();
 
-    if (!apiKey) {
-      throw new Error("YouTube API key not configured");
+    if (keys.length === 0) {
+      throw new Error("No YouTube API keys configured. Please add YOUTUBE_API_KEY in Supabase secrets.");
     }
 
     // Fetch videos by channel ID
     if (channelId) {
-      // Fetch more videos initially to have enough after filtering
       const pageTokenParam = pageToken ? `&pageToken=${pageToken}` : "";
-      const videosUrl = `https://www.googleapis.com/youtube/v3/search?part=snippet&channelId=${channelId}&type=video&order=date&maxResults=50${pageTokenParam}&key=${apiKey}`;
-      const videosResponse = await fetch(videosUrl);
-      const videosData = await videosResponse.json();
-
-      if (videosData.error) {
-        throw new Error(videosData.error.message);
-      }
+      const videosUrl = `https://www.googleapis.com/youtube/v3/search?part=snippet&channelId=${channelId}&type=video&order=date&maxResults=50${pageTokenParam}`;
+      const videosData = await fetchWithRotation(videosUrl, keys);
 
       // Get video details for view counts and durations
       const videoIds = videosData.items?.map((item: any) => item.id.videoId).join(",");
       if (videoIds) {
-        const detailsUrl = `https://www.googleapis.com/youtube/v3/videos?part=statistics,contentDetails&id=${videoIds}&key=${apiKey}`;
-        const detailsResponse = await fetch(detailsUrl);
-        const detailsData = await detailsResponse.json();
+        const detailsUrl = `https://www.googleapis.com/youtube/v3/videos?part=statistics,contentDetails&id=${videoIds}`;
+        const detailsData = await fetchWithRotation(detailsUrl, keys);
 
         // Create map with raw duration in seconds for filtering
         const detailsMap = new Map(
@@ -63,8 +86,8 @@ serve(async (req) => {
               durationSeconds: details?.durationSeconds || 0,
             };
           })
-          .filter((video: any) => video.durationSeconds >= 300) // 5 minutes = 300 seconds
-          .slice(0, 12) || []; // Limit to 12 results
+          .filter((video: any) => video.durationSeconds >= 300)
+          .slice(0, 12) || [];
 
         return new Response(JSON.stringify({ 
           videos,
@@ -74,7 +97,7 @@ serve(async (req) => {
         });
       }
 
-      return new Response(JSON.stringify({ videos: [] }), {
+      return new Response(JSON.stringify({ videos: [], nextPageToken: null }), {
         headers: { ...corsHeaders, "Content-Type": "application/json" },
       });
     }
@@ -83,23 +106,15 @@ serve(async (req) => {
       throw new Error("Search query is required");
     }
 
-    // Search for channels
-    const searchUrl = `https://www.googleapis.com/youtube/v3/search?part=snippet&q=${encodeURIComponent(query)}&type=${type}&maxResults=10&key=${apiKey}`;
-    
-    const searchResponse = await fetch(searchUrl);
-    const searchData = await searchResponse.json();
-
-    if (searchData.error) {
-      throw new Error(searchData.error.message);
-    }
+    // Search for channels or videos
+    const searchUrl = `https://www.googleapis.com/youtube/v3/search?part=snippet&q=${encodeURIComponent(query)}&type=${type}&maxResults=10`;
+    const searchData = await fetchWithRotation(searchUrl, keys);
 
     if (type === "channel" && searchData.items?.length > 0) {
       // Get channel details for subscriber counts
       const channelIds = searchData.items.map((item: any) => item.snippet.channelId || item.id.channelId).join(",");
-      const channelUrl = `https://www.googleapis.com/youtube/v3/channels?part=snippet,statistics&id=${channelIds}&key=${apiKey}`;
-      
-      const channelResponse = await fetch(channelUrl);
-      const channelData = await channelResponse.json();
+      const channelUrl = `https://www.googleapis.com/youtube/v3/channels?part=snippet,statistics&id=${channelIds}`;
+      const channelData = await fetchWithRotation(channelUrl, keys);
 
       const channels = channelData.items?.map((channel: any) => ({
         id: channel.id,
