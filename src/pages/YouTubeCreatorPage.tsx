@@ -1,6 +1,6 @@
 import { useState } from "react";
 import { useParams, Link } from "react-router-dom";
-import { useQuery } from "@tanstack/react-query";
+import { useQuery, useInfiniteQuery } from "@tanstack/react-query";
 import { ArrowLeft, Users, Play, Loader2 } from "lucide-react";
 import Header from "@/components/Header";
 import YouTubeVideoCard from "@/components/YouTubeVideoCard";
@@ -14,9 +14,6 @@ import { useAuth } from "@/contexts/AuthContext";
 const YouTubeCreatorPage = () => {
   const { channelId } = useParams<{ channelId: string }>();
   const { user } = useAuth();
-  const [videos, setVideos] = useState<YouTubeVideo[]>([]);
-  const [nextPageToken, setNextPageToken] = useState<string | null>(null);
-  const [isLoadingMore, setIsLoadingMore] = useState(false);
   const [selectedVideo, setSelectedVideo] = useState<{ id: string; title: string } | null>(null);
 
   // Get saved creator info from database
@@ -35,32 +32,25 @@ const YouTubeCreatorPage = () => {
     enabled: !!user && !!channelId,
   });
 
-  // Fetch initial videos from YouTube
-  const { isLoading } = useQuery({
+  // Fetch videos from YouTube using useInfiniteQuery
+  const {
+    data,
+    isLoading,
+    fetchNextPage,
+    hasNextPage,
+    isFetchingNextPage,
+  } = useInfiniteQuery({
     queryKey: ["channel-videos", channelId],
-    queryFn: async () => {
-      const result = await getChannelVideos(channelId!);
-      setVideos(result.videos);
-      setNextPageToken(result.nextPageToken);
-      return result;
+    queryFn: async ({ pageParam }) => {
+      return getChannelVideos(channelId!, pageParam);
     },
+    initialPageParam: undefined as string | undefined,
+    getNextPageParam: (lastPage) => lastPage.nextPageToken || undefined,
     enabled: !!channelId,
   });
 
-  const handleLoadMore = async () => {
-    if (!channelId || !nextPageToken || isLoadingMore) return;
-    
-    setIsLoadingMore(true);
-    try {
-      const result = await getChannelVideos(channelId, nextPageToken);
-      setVideos((prev) => [...prev, ...result.videos]);
-      setNextPageToken(result.nextPageToken);
-    } catch (error) {
-      console.error("Failed to load more videos:", error);
-    } finally {
-      setIsLoadingMore(false);
-    }
-  };
+  // Flatten the videos from all pages
+  const videos: YouTubeVideo[] = data?.pages.flatMap((page) => page.videos) || [];
 
   const handlePlayVideo = (videoId: string, title: string) => {
     setSelectedVideo({ id: videoId, title });
@@ -90,7 +80,7 @@ const YouTubeCreatorPage = () => {
   return (
     <div className="min-h-screen bg-background">
       <Header />
-      
+
       <main className="container py-8 space-y-8">
         {/* Back Button */}
         <Link to="/dashboard">
@@ -158,16 +148,16 @@ const YouTubeCreatorPage = () => {
                   <YouTubeVideoCard key={video.id} video={video} onPlay={handlePlayVideo} />
                 ))}
               </div>
-              
-              {nextPageToken && (
+
+              {hasNextPage && (
                 <div className="flex justify-center pt-8">
                   <Button
-                    onClick={handleLoadMore}
-                    disabled={isLoadingMore}
+                    onClick={() => fetchNextPage()}
+                    disabled={isFetchingNextPage}
                     variant="outline"
                     className="border-gold/30 text-gold hover:bg-gold/10"
                   >
-                    {isLoadingMore ? (
+                    {isFetchingNextPage ? (
                       <>
                         <Loader2 className="mr-2 h-4 w-4 animate-spin" />
                         Loading...
